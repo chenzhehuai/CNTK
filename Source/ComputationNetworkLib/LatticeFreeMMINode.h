@@ -150,7 +150,8 @@ public:
         m_maxLabelIndexes->CopyToArray(resultPointer, size);
     }
 
-    double CalculateNumeratorsWithCE(const Matrix<ElemType>& labelMatrix, const size_t nf);
+    //double CalculateNumeratorsWithCE(const Matrix<ElemType>& labelMatrix, const size_t nf);
+    double CalculateNumeratorsWithCE(const Matrix<ElemType>& labelMatrix, const size_t nf, const Matrix<ElemType>& negLabelMatrix);
 
     double ForwardBackwardProcessForDenorminator(const size_t nf, Matrix<ElemType>& posteriors,
         const Matrix<ElemType>& tmap, const Matrix<ElemType>& tmapTranspose, const Matrix<ElemType>& smap, const Matrix<ElemType>& smapTranspose);
@@ -232,7 +233,7 @@ public:
         m_likelihoods->InplaceExp(); // likelihood
         (*m_likelihoods) += (ElemType)1e-15;
 
-        double logNumeratorWithCE = CalculateNumeratorsWithCE(*inputLabel, nf);
+        double logNumeratorWithCE = CalculateNumeratorsWithCE(*inputLabel, nf, *inputNegLabel);
         double logDenominator = ForwardBackwardProcessForDenorminator(nf, *m_posteriorsDen, *m_tmap, *m_tmapTranspose, *m_smap, *m_smapTranspose);
         
         // Got the final numbers
