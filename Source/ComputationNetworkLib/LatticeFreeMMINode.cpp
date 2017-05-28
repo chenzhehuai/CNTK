@@ -304,7 +304,7 @@ double LatticeFreeMMINode<ElemType>::CalculateNumeratorsWithCE(const Matrix<Elem
                 assert(m_fsa[m_stateSequence[j - 1]][currentSenone].second != 0);
                 m_likelihoodBuffer[i * nsenones + currentSenone]-=m_boosted;
             }
-	    }
+        }
 		for (int i = 0; i < bufferSize; i++) m_likelihoodBuffer[i] = exp(m_likelihoodBuffer[i]);
 		m_likelihoods->SetValue(nsenones, nf, m_deviceId, &m_likelihoodBuffer[0]);
 	}
