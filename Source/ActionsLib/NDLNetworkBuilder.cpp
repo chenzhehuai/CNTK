@@ -560,16 +560,16 @@ void NDLNodeEvaluatorImpl<ElemType>::Evaluate(NDLNode<ElemType>* node, const wst
     }
     else if (cnNodeType == OperationNameOf(LatticeFreeMMINode))
     {
-        if (parameter.size() != 3)
-            RuntimeError("%ls should have 3 fixed parameters[labelVectorSequence, outProbVectorSequence, logPrior].", cnNodeType.c_str());
+        if (parameter.size() != 3 || arameter.size() != 4)
+            RuntimeError("%ls should have 3/4 fixed parameters[labelVectorSequence, outProbVectorSequence, logPrior].", cnNodeType.c_str());
 
         // setup the parameter position of children so we can hook them up later
-        nodeParamCount = 3;
+        nodeParamCount = parameter.size();
         nodeParamStart = 0;
 
         if (pass == ndlPassInitial)
         {
-            int id = 3; // skip labelVectorSequence, outProbVectorSequence, logPrior.
+            int id = parameter.size(); // skip labelVectorSequence, outProbVectorSequence, logPrior.
             // evaluate only scalar parameters
             vector<void*> params = EvaluateParameters(node, baseName, id, parameter.size() - id, pass);
 
@@ -595,8 +595,14 @@ void NDLNodeEvaluatorImpl<ElemType>::Evaluate(NDLNode<ElemType>* node, const wst
                 smapFilePath = smapFilePath.substr(1, smapFilePath.size() - 2);
             if (!fexists(smapFilePath))
                 RuntimeError("File pointed to by smapFilePath does not exist: %s", smapFilePath.c_str());
-
-            nodePtr = builder.LatticeFreeMMI(nullptr, nullptr, nullptr, msra::strfun::utf16(fstFilePath), msra::strfun::utf16(smapFilePath), squashingFactor, alignmentWindow, ceweight, boosted, name);
+			if (parameter.size()==3)
+			{
+            	nodePtr = builder.LatticeFreeMMI(nullptr, nullptr, nullptr, msra::strfun::utf16(fstFilePath), msra::strfun::utf16(smapFilePath), squashingFactor, alignmentWindow, ceweight, boosted, name);
+			}
+			else
+			{
+				nodePtr = builder.LatticeFreeMMINegStream(nullptr, nullptr, nullptr, nullptr, msra::strfun::utf16(fstFilePath), msra::strfun::utf16(smapFilePath), squashingFactor, alignmentWindow, ceweight, boosted, name);
+			}
         }
     }
     else if (cnNodeType == OperationNameOf(CropNode))

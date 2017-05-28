@@ -45,6 +45,7 @@ class LatticeFreeMMINode : public ComputationNodeNonLooping /*ComputationNode*/<
         CreateMatrixIfNull(m_smap);
         CreateMatrixIfNull(m_mbValues);
         CreateMatrixIfNull(m_mbLabels);
+        if (m_negLabels) CreateMatrixIfNull(m_mbNegLabels);
         CreateMatrixIfNull(m_mbGradients);
     }
 
@@ -63,20 +64,26 @@ class LatticeFreeMMINode : public ComputationNodeNonLooping /*ComputationNode*/<
     
 public:
     LatticeFreeMMINode(DEVICEID_TYPE deviceId, const wstring& name)
-        : Base(deviceId, name), m_squashingFactor(1.0), m_alignmentWindow(0), m_ceweight(0), m_totalFrameNumberOfCurrentMinibatch(0), m_boosted(0)
+        : Base(deviceId, name), m_squashingFactor(1.0), m_alignmentWindow(0), m_ceweight(0), m_totalFrameNumberOfCurrentMinibatch(0), m_boosted(0), m_negLabels(0)
     {
         InitMatrixes();
     }
 
     LatticeFreeMMINode(DEVICEID_TYPE deviceId, const wstring& name, const wstring& fstFilePath, const wstring& smapFilePath, const ElemType squashingFactor, const int alignmentWindow, const ElemType ceweight, const ElemType boosted)
-        : Base(deviceId, name), m_squashingFactor(squashingFactor), m_alignmentWindow(alignmentWindow), m_ceweight(ceweight), m_totalFrameNumberOfCurrentMinibatch(0), m_boosted(boosted)
+        : Base(deviceId, name), m_squashingFactor(squashingFactor), m_alignmentWindow(alignmentWindow), m_ceweight(ceweight), m_totalFrameNumberOfCurrentMinibatch(0), m_boosted(boosted), m_negLabels(0)
     {
         InitMatrixes();
         InitializeFromTfstFiles(fstFilePath, smapFilePath);
     }
+	LatticeFreeMMINode(DEVICEID_TYPE deviceId, const wstring& name, const wstring& fstFilePath, const wstring& smapFilePath, const ElemType squashingFactor, const int alignmentWindow, const ElemType ceweight, const ElemType boosted, const int negLabels)
+		: Base(deviceId, name), m_squashingFactor(squashingFactor), m_alignmentWindow(alignmentWindow), m_ceweight(ceweight), m_totalFrameNumberOfCurrentMinibatch(0), m_boosted(boosted), m_negLabels(negLabels)
+	{
+		InitMatrixes();
+		InitializeFromTfstFiles(fstFilePath, smapFilePath);
+	}
 
     LatticeFreeMMINode(const ScriptableObjects::IConfigRecordPtr configp)
-        : LatticeFreeMMINode(configp->Get(L"deviceId"), L"<placeholder>", configp->Get(L"fstFilePath"), configp->Get(L"smapFilePath"), configp->Get(L"squashingFactor"), configp->Get(L"alignmentWindow"), configp->Get(L"ceweight"), configp->Get(L"boosted"))
+        : LatticeFreeMMINode(configp->Get(L"deviceId"), L"<placeholder>", configp->Get(L"fstFilePath"), configp->Get(L"smapFilePath"), configp->Get(L"squashingFactor"), configp->Get(L"alignmentWindow"), configp->Get(L"ceweight"), configp->Get(L"boosted"), configp->Get(L"negLabels"))
     {
         AttachInputsFromConfig(configp, this->GetExpectedNumInputs());
     }
@@ -156,12 +163,16 @@ public:
 
         FrameRange fr(Input(0)->GetMBLayout());
 
-        auto inputV = Input(1)->ValueFor(fr);
+        auto inputV = Input(1+m_negLabels)->ValueFor(fr);
         auto inputL = Input(0)->ValueFor(fr);
         auto inputValue = &inputV;
         auto inputLabel = &inputL;
 
+		auto inputNegL= m_negLabels? Input(0)->ValueFor(fr): NULL;
+        auto inputNegLabel = m_negLabels? &inputNegL: NULL;		
+
         size_t nf = inputValue->GetNumCols();
+		if (m_negLabels) assert(nf==inputNegLabel->GetNumCols());
         if (m_totalFrameNumberOfCurrentMinibatch > 0)
         {
             if (m_firstPassFinished) // Second pass of forward propergation
@@ -176,10 +187,12 @@ public:
                 size_t numRows = inputValue->GetNumRows();
                 m_mbValues->Resize(numRows, m_totalFrameNumberOfCurrentMinibatch);
                 m_mbLabels->Resize(numRows, m_totalFrameNumberOfCurrentMinibatch);
+				if (m_negLabels) m_mbNegLabels->Resize(numRows, m_totalFrameNumberOfCurrentMinibatch);				
             }
 
             m_mbValues->SetColumnSlice(*inputValue, m_frameNumberOfCurrentMinibatch, nf);
             m_mbLabels->SetColumnSlice(*inputLabel, m_frameNumberOfCurrentMinibatch, nf);
+            if (m_negLabels) m_mbNegLabels->SetColumnSlice(*inputNegLabel, m_frameNumberOfCurrentMinibatch, nf);			
             m_frameNumberOfCurrentMinibatch += nf;
 
             if (m_frameNumberOfCurrentMinibatch < m_totalFrameNumberOfCurrentMinibatch)
@@ -195,6 +208,7 @@ public:
             m_firstPassFinished = true;
             inputValue = m_mbValues.get();
             inputLabel = m_mbLabels.get();
+			if (m_negLabels) inputNegLabel = m_mbNegLabels.get();			
             nf = m_totalFrameNumberOfCurrentMinibatch;
         }
 
@@ -510,6 +524,8 @@ protected:
 
     shared_ptr<Matrix<ElemType>> m_mbValues;
     shared_ptr<Matrix<ElemType>> m_mbLabels;
+	bool m_negLabels;
+    shared_ptr<Matrix<ElemType>> m_mbNegLabels;	
     shared_ptr<Matrix<ElemType>> m_mbGradients;
 
     // For CE
