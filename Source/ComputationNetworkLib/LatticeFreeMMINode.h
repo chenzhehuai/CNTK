@@ -83,8 +83,9 @@ public:
 	}
 
     LatticeFreeMMINode(const ScriptableObjects::IConfigRecordPtr configp)
-        : LatticeFreeMMINode(configp->Get(L"deviceId"), L"<placeholder>", configp->Get(L"fstFilePath"), configp->Get(L"smapFilePath"), configp->Get(L"squashingFactor"), configp->Get(L"alignmentWindow"), configp->Get(L"ceweight"), configp->Get(L"boosted"), configp->Get(L"negLabels"))
+        : LatticeFreeMMINode(configp->Get(L"deviceId"), L"<placeholder>", configp->Get(L"fstFilePath"), configp->Get(L"smapFilePath"), configp->Get(L"squashingFactor"), configp->Get(L"alignmentWindow"), configp->Get(L"ceweight"), configp->Get(L"boosted")) //, configp->Get(L"negLabels")
     {
+        if (configp->Find(L"negLabels")) m_negLabels=configp->Get(L"negLabels");
         AttachInputsFromConfig(configp, this->GetExpectedNumInputs());
     }
 
@@ -168,8 +169,13 @@ public:
         auto inputValue = &inputV;
         auto inputLabel = &inputL;
 
-		auto inputNegL= m_negLabels? Input(0)->ValueFor(fr): NULL;
-        auto inputNegLabel = m_negLabels? &inputNegL: NULL;		
+		auto inputNegL=Input(0)->ValueFor(fr);
+        auto inputNegLabel=&inputNegL;
+        if (m_negLabels) 
+        {
+            inputNegL=Input(1)->ValueFor(fr);
+            inputNegLabel=&inputNegL;	
+        }
 
         size_t nf = inputValue->GetNumCols();
 		if (m_negLabels) assert(nf==inputNegLabel->GetNumCols());

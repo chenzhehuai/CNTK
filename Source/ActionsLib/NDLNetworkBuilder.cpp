@@ -560,7 +560,7 @@ void NDLNodeEvaluatorImpl<ElemType>::Evaluate(NDLNode<ElemType>* node, const wst
     }
     else if (cnNodeType == OperationNameOf(LatticeFreeMMINode))
     {
-        if (parameter.size() != 3 || arameter.size() != 4)
+        if (parameter.size() != 3 || parameter.size() != 4)
             RuntimeError("%ls should have 3/4 fixed parameters[labelVectorSequence, outProbVectorSequence, logPrior].", cnNodeType.c_str());
 
         // setup the parameter position of children so we can hook them up later
