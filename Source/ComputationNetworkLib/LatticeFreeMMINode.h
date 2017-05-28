@@ -36,7 +36,10 @@ class LatticeFreeMMINode : public ComputationNodeNonLooping /*ComputationNode*/<
     UsingComputationNodeMembersBoilerplate;
     static const std::wstring TypeName()
     {
-        return L"LatticeFreeMMI";
+    	if (m_negLabels)
+			return L"LatticeFreeMMINegStream";
+		else
+	        return L"LatticeFreeMMI";
     }
 
     void InitMatrixes()
