@@ -30,16 +30,16 @@ namespace Microsoft { namespace MSR { namespace CNTK {
 // -----------------------------------------------------------------------
 
 template <class ElemType>
-class LatticeFreeMMINode : public ComputationNodeNonLooping /*ComputationNode*/<ElemType>, public NumInputs<3>
+class LatticeFreeMMINode : public ComputationNodeNonLooping /*ComputationNode*/<ElemType>, public NumInputs<4>
 {
     typedef ComputationNodeNonLooping<ElemType> Base;
     UsingComputationNodeMembersBoilerplate;
     static const std::wstring TypeName()
     {
-    	if (m_negLabels)
+    	//if (m_negLabels)
 			return L"LatticeFreeMMINegStream";
-		else
-	        return L"LatticeFreeMMI";
+		//else
+	    //    return L"LatticeFreeMMI";
     }
 
     void InitMatrixes()
@@ -88,8 +88,16 @@ public:
     LatticeFreeMMINode(const ScriptableObjects::IConfigRecordPtr configp)
         : LatticeFreeMMINode(configp->Get(L"deviceId"), L"<placeholder>", configp->Get(L"fstFilePath"), configp->Get(L"smapFilePath"), configp->Get(L"squashingFactor"), configp->Get(L"alignmentWindow"), configp->Get(L"ceweight"), configp->Get(L"boosted")) //, configp->Get(L"negLabels")
     {
-        if (configp->Find(L"negLabels")) m_negLabels=configp->Get(L"negLabels");
-        AttachInputsFromConfig(configp, this->GetExpectedNumInputs());
+        if (configp->Find(L"negLabels")) 
+        {
+            m_negLabels=configp->Get(L"negLabels");
+            //it's a hack, because of:  class LatticeFreeMMINode : public ComputationNodeNonLooping /*ComputationNode*/<ElemType>, public NumInputs<3>
+            AttachInputsFromConfig(configp, 4);
+        }
+        else
+        {
+            AttachInputsFromConfig(configp, this->GetExpectedNumInputs());
+        }
     }
 
     void SetTotalFrameNumberofCurrentMinibatch(const size_t nf)
@@ -104,7 +112,7 @@ public:
         if (inputIndex == 1)
         {
             FrameRange fr(Input(0)->GetMBLayout());
-            auto gradient = Input(1)->GradientFor(fr);
+            auto gradient = Input(1+m_negLabels)->GradientFor(fr);
 
             if (m_totalFrameNumberOfCurrentMinibatch == 0 || m_frameNumberOfCurrentMinibatch == m_totalFrameNumberOfCurrentMinibatch)
             {
@@ -228,7 +236,7 @@ public:
         m_likelihoods->AssignLogSoftmaxOf(*inputValue, true);
         if (m_ceweight != 0)
             m_softmax->SetValue(*m_likelihoods);
-        (*m_likelihoods) -= Input(2)->ValueAsMatrix();
+        (*m_likelihoods) -= Input(2+m_negLabels)->ValueAsMatrix();
 
         if (m_squashingFactor != (ElemType)1.0)    // squashing factor
             (*m_likelihoods) *= m_squashingFactor;
@@ -534,7 +542,7 @@ protected:
 
     shared_ptr<Matrix<ElemType>> m_mbValues;
     shared_ptr<Matrix<ElemType>> m_mbLabels;
-	bool m_negLabels;
+	int m_negLabels;
     shared_ptr<Matrix<ElemType>> m_mbNegLabels;	
     shared_ptr<Matrix<ElemType>> m_mbGradients;
 
