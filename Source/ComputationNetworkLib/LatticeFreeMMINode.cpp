@@ -141,7 +141,7 @@ void LatticeFreeMMINode<ElemType>::InitializeFromTfstFiles(const wstring& fstFil
 // If m_ceweight == 0, return the log numerator score of MMI
 // Else, return (1-m_ceweight) * logNum - m_ceweight * logCE
 template <class ElemType>
-double LatticeFreeMMINode<ElemType>::CalculateNumeratorsWithCE(const Matrix<ElemType>& labelMatrix, const size_t nf)
+double LatticeFreeMMINode<ElemType>::CalculateNumeratorsWithCE(const Matrix<ElemType>& labelMatrix, const size_t nf, const Matrix<ElemType>& negLabelMatrix)
 {
     if (nf == 0) return 0;
 
@@ -289,6 +289,16 @@ double LatticeFreeMMINode<ElemType>::CalculateNumeratorsWithCE(const Matrix<Elem
     m_posteriorsNum->Resize(nsenones, nf);
     m_posteriorsNum->SetValue(nsenones, nf, m_deviceId, &m_posteriorsAtHost[0]);
 
+	if (m_negLabels)
+	{
+		assert(m_boosted);
+		GetLabelSequence(negLabelMatrix);
+	    for (int i = 0+1; i < nf; i++)
+	    {	       
+			int currentSenone = (int)m_labelVector[i];
+            m_likelihoodBuffer[i * nsenones + currentSenone]+=m_boosted;	//twice boosted the negtive stream
+	    }
+	}
 	if (m_boosted != 0)
 	{
 		for (int i = 0; i < bufferSize; i++) m_likelihoodBuffer[i] += m_boosted;
@@ -308,7 +318,6 @@ double LatticeFreeMMINode<ElemType>::CalculateNumeratorsWithCE(const Matrix<Elem
 		for (int i = 0; i < bufferSize; i++) m_likelihoodBuffer[i] = exp(m_likelihoodBuffer[i]);
 		m_likelihoods->SetValue(nsenones, nf, m_deviceId, &m_likelihoodBuffer[0]);
 	}
-	
     // return the forward path score
     if (m_ceweight == 0)
         return logForwardScore;
