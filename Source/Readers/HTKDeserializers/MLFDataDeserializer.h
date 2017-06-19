@@ -5,24 +5,28 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
-#include "HTKDeserializer.h"
+#include "DataDeserializer.h"
+#include "HTKDataDeserializer.h"
+#include "../HTKMLFReader/biggrowablevectors.h"
 #include "CorpusDescriptor.h"
-#include "MLFUtils.h"
-#include "MLFIndexer.h"
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
+
+// A constant used in 1-hot vectors to identify the first frame of a phone.
+// Used primarily in CTC-type training.
+static float PHONE_BOUNDARY = 2.0f;
+
 // Class represents an MLF deserializer.
 // Provides a set of chunks/sequences to the upper layers.
-class MLFDeserializer : public DataDeserializerBase, boost::noncopyable
+class MLFDataDeserializer : public DataDeserializerBase
 {
 public:
     // Expects new configuration.
-    MLFDeserializer(CorpusDescriptorPtr corpus, const ConfigParameters& config, bool primary);
+    MLFDataDeserializer(CorpusDescriptorPtr corpus, const ConfigParameters& config, bool primary);
 
     // TODO: Should be removed, when all readers go away, expects configuration in a legacy mode.
-    MLFDeserializer(CorpusDescriptorPtr corpus, const ConfigParameters& config, const std::wstring& streamName);
+    MLFDataDeserializer(CorpusDescriptorPtr corpus, const ConfigParameters& config, const std::wstring& streamName);
 
     // Retrieves sequence description by its key. Used for deserializers that are not in "primary"/"driving" mode.
     bool GetSequenceDescriptionByKey(const KeyType& key, SequenceDescription& s) override;
@@ -34,29 +38,41 @@ public:
     virtual void GetSequencesForChunk(ChunkIdType chunkId, std::vector<SequenceDescription>& s) override;
 
     // Retrieves a chunk with data.
+    // TODO: Currently it is a single chunk => all labels are loaded into memory.
+    // TODO: After we switch the timeline to work in chunks, we will also introduce chunking of labels.
     virtual ChunkPtr GetChunk(ChunkIdType) override;
 
 private:
-    class ChunkBase;
-    class SequenceChunk;
-    class FrameChunk;
+    class MLFChunk;
+    DISABLE_COPY_AND_MOVE(MLFDataDeserializer);
 
-    // Initializes chunk descriptions.
-    void InitializeChunkDescriptions(CorpusDescriptorPtr corpus, const ConfigHelper& config, const std::wstring& stateListPath);
+    void InitializeChunkDescriptions(CorpusDescriptorPtr corpus, const ConfigHelper& config, const std::wstring& stateListPath, size_t dimension);
+    void InitializeStream(const std::wstring& name, size_t dimension);
 
-    // Initializes a single stream this deserializer exposes.
-    void InitializeStream(const std::wstring& name);
+    void GetSequenceById(size_t sequenceId, std::vector<SequenceDataPtr>& result);
 
-    // In frame mode initializes data for all categories/labels in order to
-    // avoid memory copy.
-    void InitializeReadOnlyArrayOfLabels();
-
-    // Vector that maps KeyType.m_sequence into an utterance ID (or type max() if the key is not assigned).
+    // Vector that maps KeyType.m_sequence into an utterance ID (or SIZE_MAX if the key is not assigned).
     // This assumes that IDs introduced by the corpus are dense (which they right now, depending on the number of invalid / filtered sequences).
-    std::vector<std::pair<ChunkIdType, uint32_t>> m_keyToSequence;
+    // TODO compare perf to map we had before.
+    std::vector<size_t> m_keyToSequence;
+
+    // Number of sequences
+    size_t m_numberOfSequences = 0;
+
+    // Array of all labels.
+    msra::dbn::biggrowablevector<msra::dbn::CLASSIDTYPE> m_classIds;
+
+    // Phone boundaries in each sequence
+    vector<vector<size_t>> m_phoneBoundaries;
+
+    // Index of utterances in the m_classIds (index of the first frame of the utterance)
+    msra::dbn::biggrowablevector<size_t> m_utteranceIndex;
 
     // Type of the data this serializer provides.
     ElementType m_elementType;
+
+    // Total number of frames.
+    size_t m_totalNumberOfFrames;
 
     // Array of available categories.
     // We do no allocate data for all input sequences, only returning a pointer to existing category.
@@ -69,21 +85,9 @@ private:
     // Flag that indicates whether a single speech frames should be exposed as a sequence.
     bool m_frameMode;
 
-    CorpusDescriptorPtr m_corpus;
-
-    std::vector<const ChunkDescriptor*> m_chunks;
-    std::map<const ChunkDescriptor*, size_t> m_chunkToFileIndex;
-
-    size_t m_dimension;
-    size_t m_chunkSizeBytes;
-
     // Track phone boundaries
     bool m_withPhoneBoundaries;
-
-    StateTablePtr m_stateTable;
-
-    std::vector<std::pair<std::wstring, MLFIndexerPtr>> m_indexers;
-    std::vector<std::wstring> m_mlfFiles;
 };
+
 
 }}}

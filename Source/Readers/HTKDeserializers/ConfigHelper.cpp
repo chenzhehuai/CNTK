@@ -217,28 +217,28 @@ wstring ConfigHelper::GetRandomizer()
     return randomizer;
 }
 
-vector<string> ConfigHelper::GetSequencePaths()
+vector<wstring> ConfigHelper::GetSequencePaths()
 {
-    string scriptPath = m_config(L"scpFile");
-    string rootPath = m_config(L"prefixPathInSCP", "");
+    wstring scriptPath = m_config(L"scpFile");
+    wstring rootPath = m_config(L"prefixPathInSCP", L"");
 
-    vector<string> filelist;
-    fprintf(stderr, "Reading script file %s ...", scriptPath.c_str());
+    vector<wstring> filelist;
+    fprintf(stderr, "Reading script file %ls ...", scriptPath.c_str());
 
     // TODO: possibly change to class File, we should be able to read data from pipelines.E.g.
     //  scriptPath = "gzip -c -d FILE.txt |", or do a popen with C++ streams, so that we can have a generic open function that returns an ifstream.
-    ifstream scp(scriptPath.c_str());
+    ifstream scp(msra::strfun::utf8(scriptPath).c_str());
     if (!scp)
-        RuntimeError("Failed to open input file: %s", scriptPath.c_str());
+        RuntimeError("Failed to open input file: %ls", scriptPath.c_str());
 
     string line;
     while (getline(scp, line))
     {
-        filelist.push_back(line);
+        filelist.push_back(msra::strfun::utf16(line));
     }
 
     if (scp.bad())
-        RuntimeError("An error occurred while reading input file: %s", scriptPath.c_str());
+        RuntimeError("An error occurred while reading input file: %ls", scriptPath.c_str());
 
     fprintf(stderr, " %d entries\n", static_cast<int>(filelist.size()));
 
@@ -251,28 +251,28 @@ vector<string> ConfigHelper::GetSequencePaths()
         replace(rootPath.begin(), rootPath.end(), L'\\', L'/');
 
         // second, remove trailing slash if there is any
-        regex trailer("/+$");
-        rootPath = regex_replace(rootPath, trailer, string());
+        wregex trailer(L"/+$");
+        rootPath = regex_replace(rootPath, trailer, wstring());
 
         // third, join the rootPath with each entry in filelist
         if (!rootPath.empty())
         {
-            for (string& path : filelist)
+            for (wstring& path : filelist)
             {
                 if (path.find_first_of(L'=') != wstring::npos)
                 {
-                    vector<string> strarr = msra::strfun::split(path, "=");
+                    vector<wstring> strarr = msra::strfun::split(path, L"=");
 #ifdef WIN32
-                    replace(strarr[1].begin(), strarr[1].end(), '\\', '/');
+                    replace(strarr[1].begin(), strarr[1].end(), L'\\', L'/');
 #endif
-                    path = strarr[0] + "=" + rootPath + "/" + strarr[1];
+                    path = strarr[0] + L"=" + rootPath + L"/" + strarr[1];
                 }
                 else
                 {
 #ifdef WIN32
                     replace(path.begin(), path.end(), L'\\', L'/');
 #endif
-                    path = rootPath + "/" + path;
+                    path = rootPath + L"/" + path;
                 }
             }
         }
@@ -294,14 +294,13 @@ vector<string> ConfigHelper::GetSequencePaths()
                 This works well if you store the scp file with the features but
                 do not want different scp files everytime you move or create new features
                 */
-        string scpDirCached;
+        wstring scpDirCached;
         for (auto& entry : filelist)
         {
             ExpandDotDotDot(entry, scriptPath, scpDirCached);
         }
     }
 
-    filelist.shrink_to_fit();
     return filelist;
 }
 
@@ -319,16 +318,16 @@ intargvector ConfigHelper::GetNumberOfUtterancesPerMinibatchForAllEppochs()
     return numberOfUtterances;
 }
 
-void ConfigHelper::ExpandDotDotDot(string& featPath, const string& scpPath, string& scpDirCached)
+void ConfigHelper::ExpandDotDotDot(wstring& featPath, const wstring& scpPath, wstring& scpDirCached)
 {
-    string delim = "/\\";
+    wstring delim = L"/\\";
 
     if (scpDirCached.empty())
     {
         scpDirCached = scpPath;
-        string tail;
+        wstring tail;
         auto pos = scpDirCached.find_last_of(delim);
-        if (pos != string::npos)
+        if (pos != wstring::npos)
         {
             tail = scpDirCached.substr(pos + 1);
             scpDirCached.resize(pos);
@@ -336,7 +335,7 @@ void ConfigHelper::ExpandDotDotDot(string& featPath, const string& scpPath, stri
         if (tail.empty()) // nothing was split off: no dir given, 'dir' contains the filename
             scpDirCached.swap(tail);
     }
-    size_t pos = featPath.find("...");
+    size_t pos = featPath.find(L"...");
     if (pos != featPath.npos)
         featPath = featPath.substr(0, pos) + scpDirCached + featPath.substr(pos + 3);
 }
